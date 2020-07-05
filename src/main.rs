@@ -1,11 +1,14 @@
-use std::{env, fs, io, ffi};
+use std::{env, fs, io, process};
+use std::ffi::OsString;
 use std::collections::HashMap;
 use std::iter::Iterator;
+use std::io::Error;
 
 const MAX_FILES: usize = 100;
 
 type NameMap = HashMap<String, u8>;
 
+#[derive(PartialEq, PartialOrd, Eq, Ord)]
 struct ShortName {
     name: Vec<u8>, // TODO enforce size 8
     ext: Vec<u8>, // TODO enforce size 3
@@ -98,19 +101,37 @@ impl From<ShortName> for String {
     }
 }
 
-fn main() -> io::Result<()> {
-    let files = getfiles(match env::args_os().nth(1) {
-        Some(s) => s,
-        None => ffi::OsString::from("."),
-    }, MAX_FILES)?;
+fn fatal(err: Error) -> ! {
+    let process_name = match env::args_os().nth(0) {
+        Some(os_str) => {
+            match os_str.into_string() {
+                Ok(s) => s,
+                Err(_) => "Error".to_string(),
+            }
+        }
+        None => "Error".to_string()
+    };
+    eprintln!("{}: {}", process_name, err);
+    process::exit(1);
+}
 
+fn main() {
+    let mut files;
+    match getfiles(&match env::args_os().nth(1) {
+        Some(s) => s,
+        None => OsString::from("."),
+    }, MAX_FILES) {
+        Ok(x) => files = x,
+        Err(err) => fatal(err),
+    }
+
+    files.sort_unstable();
     for file in files {
         println!("{}", String::from(file));
     }
-    Ok(())
 }
 
-fn getfiles(path: ffi::OsString, max_files: usize)
+fn getfiles(path: &OsString, max_files: usize)
     -> io::Result<Vec<ShortName>>
 {
     let mut files = Vec::new();
