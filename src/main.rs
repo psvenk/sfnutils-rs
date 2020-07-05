@@ -2,6 +2,8 @@ use std::{env, fs, io, ffi};
 use std::collections::HashMap;
 use std::iter::Iterator;
 
+const MAX_FILES: usize = 100;
+
 type NameMap = HashMap<String, u8>;
 
 struct ShortName {
@@ -96,43 +98,31 @@ impl From<ShortName> for String {
     }
 }
 
-// Convert an iterator of u8 to a fixed-size array
-// fn bytes_to_array<A: Iterator + Default, T: Iterator>(bytes: T) -> A {
-//     let mut arr = A::default();
-//     for (i, _) in arr.enumerate() {
-//         match bytes.next() {
-//             Some(n) => arr[i] = n,
-//             None => arr[i] = b' ',
-//         }
-//     }
-//     arr
-// }
-
-const MAX_FILES: u8 = 100;
-
-fn main() {
-    let num_files = getfiles(match env::args_os().nth(1) {
+fn main() -> io::Result<()> {
+    let files = getfiles(match env::args_os().nth(1) {
         Some(s) => s,
         None => ffi::OsString::from("."),
-    }, MAX_FILES).unwrap();
+    }, MAX_FILES)?;
+
+    for file in files {
+        println!("{}", String::from(file));
+    }
+    Ok(())
 }
 
-fn getfiles(path: ffi::OsString, max_files: u8) -> io::Result<u8> {
-    let mut num_files = 0;
+fn getfiles(path: ffi::OsString, max_files: usize)
+    -> io::Result<Vec<ShortName>>
+{
+    let mut files = Vec::new();
     let mut map = HashMap::new();
 
     for entry in fs::read_dir(path)? {
-        if num_files >= max_files {
+        if files.len() >= max_files {
             break;
         }
-
         let name_os_string = entry?.file_name();
         let name = name_os_string.to_string_lossy();
-        // println!("{}", name);
-        let shortname = ShortName::from_string(&name, &mut map);
-        println!("{}", String::from(shortname));
-
-        num_files += 1;
+        files.push(ShortName::from_string(&name, &mut map));
     }
-    Ok(0)
+    Ok(files)
 }
