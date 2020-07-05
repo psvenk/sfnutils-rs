@@ -3,6 +3,7 @@ use std::ffi::OsString;
 use std::collections::HashMap;
 use std::iter::Iterator;
 use std::io::Error;
+use std::fmt;
 
 const MAX_FILES: usize = 100;
 
@@ -15,7 +16,7 @@ struct ShortName {
 }
 
 impl ShortName {
-    fn from_string(orig_name: &str, map: &mut NameMap) -> Self {
+    fn from_str(orig_name: &str, map: &mut NameMap) -> Self {
         let mut name = orig_name.as_bytes().to_vec();
         let mut remove_i_list = Vec::with_capacity(name.len());
         let mut separator_i = None;
@@ -61,6 +62,7 @@ impl ShortName {
                 name.truncate(6);
             }
 
+            // Rationale: all non-ASCII characters have been stripped.
             let key = unsafe {
                 String::from_utf8_unchecked(name.clone())
             };
@@ -101,13 +103,11 @@ impl ShortName {
     }
 }
 
-impl From<ShortName> for String {
-    fn from(sn: ShortName) -> Self {
-        let (name, ext) = unsafe {(
-            str::from_utf8_unchecked(&sn.name),
-            str::from_utf8_unchecked(&sn.ext),
-        )};
-        format!("{} {}", name, ext)
+impl fmt::Display for ShortName {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let name = str::from_utf8(&self.name).map_err(|_| fmt::Error)?;
+        let ext = str::from_utf8(&self.ext).map_err(|_| fmt::Error)?;
+        write!(f, "{} {}", name, ext)
     }
 }
 
@@ -137,7 +137,7 @@ fn main() {
 
     files.sort_unstable();
     for file in files {
-        println!("{}", String::from(file));
+        println!("{}", file);
     }
 }
 
@@ -153,7 +153,7 @@ fn getfiles(path: &OsString, max_files: usize)
         }
         let name_os_string = entry?.file_name();
         let name = name_os_string.to_string_lossy();
-        files.push(ShortName::from_string(&name, &mut map));
+        files.push(ShortName::from_str(&name, &mut map));
     }
     Ok(files)
 }
