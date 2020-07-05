@@ -2,37 +2,97 @@ use std::{env, fs, io, ffi};
 use std::collections::HashMap;
 use std::iter::Iterator;
 
-struct NameMap<'a>(HashMap<&'a str, u8>);
+type NameMap = HashMap<String, u8>;
 
-struct ShortName<'a> {
-    name: &'a [u8],
-    ext: &'a [u8],
+struct ShortName {
+    name: Vec<u8>, // TODO enforce size 8
+    ext: Vec<u8>, // TODO enforce size 3
 }
 
-impl ShortName<'_> {
-    fn from_string<'a>(orig_name: &'a str, map: &NameMap) -> Self {
-        let mut name: [u8] = orig_name.as_bytes();
-        let mut ext: [u8] = orig_name.as_bytes();
-        for i in 0..8 {
-            // TODO do whatever transformations
+impl ShortName {
+    fn from_string(orig_name: &str, map: &mut NameMap) -> Self {
+        let mut name = orig_name.as_bytes().to_vec();
+        let mut remove_i_list = Vec::with_capacity(name.len());
+        let mut separator_i = None;
+        let mut modified = false;
+
+        for (i, x) in name.iter_mut().enumerate().rev() {
+            if !x.is_ascii() || *x == b'+' {
+                modified = true;
+                *x = b'_';
+            } else if *x == b'.' && i > 0 && separator_i == None {
+                separator_i = Some(i);
+            } else if *x == b' ' || *x == b'.' {
+                modified = true;
+                remove_i_list.push(i);
+            } else {
+                *x = x.to_ascii_uppercase();
+            };
         }
-        // TODO trim down arrays
-        // Actually maybe use the String method truncate or something like that?
-        // We still need to fill it to 8 characters / 3 characters using spaces
-        // name.copy_from_slice(&orig_name.bytes().take(8).collect::<Vec<_>>());
-        // ext.copy_from_slice(&orig_name.bytes().take(3).collect::<Vec<_>>());
-        // let name = &'a orig_name.bytes().take(8).collect::<Vec<_>>();
-        // let ext  = &'a orig_name.bytes().take(3).collect::<Vec<_>>();
-        // ShortName { name: &name, ext: &ext }
-        ShortName { name: [65, 66, 67, 68, 69, 70, 71, 72], ext: [66; 3] }
+
+        let mut ext;
+        match separator_i {
+            Some(i) => {
+                name.remove(i);
+                ext = name.split_off(i);
+                if ext.len() > 3 {
+                    modified = true;
+                }
+                ext.truncate(3);
+            }
+            None => ext = Vec::new(),
+        };
+
+        if name.len() > 8 {
+            modified = true;
+        }
+
+        for i in remove_i_list {
+            name.remove(i);
+        }
+
+        if modified {
+            if name.len() > 6 {
+                name.truncate(6);
+            }
+
+            let key = unsafe {
+                String::from_utf8_unchecked(name.clone())
+            };
+            let num = match map.get(&key) {
+                Some(n) => n + 1,
+                None => 1,
+            };
+            map.insert(key, num);
+
+            if num < 10 {
+                name.extend_from_slice(&[
+                    b'~',
+                    b'0' + num,
+                ]);
+            } else {
+                name.remove(name.len() - 1);
+                name.extend_from_slice(&[
+                    b'~',
+                    b'0' + num / 10,
+                    b'0' + num % 10,
+                ]);
+            }
+        }
+
+        ShortName { name: name, ext: ext }
     }
 }
 
-impl From<ShortName<'_>> for String {
+impl From<ShortName> for String {
     fn from(sn: ShortName) -> Self {
-        let name = String::from_utf8(sn.name.to_vec()).unwrap();
-        let ext = String::from_utf8(sn.ext.to_vec()).unwrap();
-        format!("{}.{}", name, ext)
+        let name = unsafe {
+            String::from_utf8_unchecked(sn.name)
+        };
+        let ext = unsafe {
+            String::from_utf8_unchecked(sn.ext)
+        };
+        format!("{:8} {:3}", name, ext)
     }
 }
 
@@ -59,7 +119,7 @@ fn main() {
 
 fn getfiles(path: ffi::OsString, max_files: u8) -> io::Result<u8> {
     let mut num_files = 0;
-    let map = NameMap(HashMap::new());
+    let mut map = HashMap::new();
 
     for entry in fs::read_dir(path)? {
         if num_files >= max_files {
@@ -69,7 +129,7 @@ fn getfiles(path: ffi::OsString, max_files: u8) -> io::Result<u8> {
         let name_os_string = entry?.file_name();
         let name = name_os_string.to_string_lossy();
         // println!("{}", name);
-        let shortname = ShortName::from_string(&name, &map);
+        let shortname = ShortName::from_string(&name, &mut map);
         println!("{}", String::from(shortname));
 
         num_files += 1;
