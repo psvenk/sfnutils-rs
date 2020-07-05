@@ -1,4 +1,4 @@
-use std::{env, fs, io, process};
+use std::{env, fs, io, process, str};
 use std::ffi::OsString;
 use std::collections::HashMap;
 use std::iter::Iterator;
@@ -10,8 +10,8 @@ type NameMap = HashMap<String, u8>;
 
 #[derive(PartialEq, PartialOrd, Eq, Ord)]
 struct ShortName {
-    name: Vec<u8>, // TODO enforce size 8
-    ext: Vec<u8>, // TODO enforce size 3
+    name: [u8; 8],
+    ext: [u8; 3],
 }
 
 impl ShortName {
@@ -85,19 +85,29 @@ impl ShortName {
             }
         }
 
-        ShortName { name: name, ext: ext }
+        let mut name_array = [b' '; 8];
+        let mut ext_array = [b' '; 3];
+        for (i, x) in name_array.iter_mut().enumerate() {
+            if let Some(c) = name.get(i) {
+                *x = *c;
+            }
+        }
+        for (i, x) in ext_array.iter_mut().enumerate() {
+            if let Some(c) = ext.get(i) {
+                *x = *c;
+            }
+        }
+        ShortName { name: name_array, ext: ext_array }
     }
 }
 
 impl From<ShortName> for String {
     fn from(sn: ShortName) -> Self {
-        let name = unsafe {
-            String::from_utf8_unchecked(sn.name)
-        };
-        let ext = unsafe {
-            String::from_utf8_unchecked(sn.ext)
-        };
-        format!("{:8} {:3}", name, ext)
+        let (name, ext) = unsafe {(
+            str::from_utf8_unchecked(&sn.name),
+            str::from_utf8_unchecked(&sn.ext),
+        )};
+        format!("{} {}", name, ext)
     }
 }
 
