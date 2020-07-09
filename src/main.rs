@@ -39,6 +39,11 @@ impl ShortName {
         let mut ext;
         match separator_i {
             Some(i) => {
+                for j in &remove_i_list {
+                    if *j > i {
+                        name.remove(*j);
+                    }
+                }
                 name.remove(i);
                 ext = name.split_off(i);
                 if ext.len() > 3 {
@@ -53,8 +58,10 @@ impl ShortName {
             modified = true;
         }
 
-        for i in remove_i_list {
-            name.remove(i);
+        for i in &remove_i_list {
+            if *i < name.len() {
+                name.remove(*i);
+            }
         }
 
         if modified {
