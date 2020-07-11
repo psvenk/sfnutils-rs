@@ -1,7 +1,0 @@
-sfnutils-rs: abandoned testing ground for playing with Rust (building on the
-codebase of sfnutils <https://github.com/psvenk/sfnutils>).
-
-Please see file COPYING for license information (in brief: you can do whatever
-you want with this as long as you preserve the contents of the file COPYING).
-
-vim: set tw=80:
